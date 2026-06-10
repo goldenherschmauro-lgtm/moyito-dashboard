@@ -206,6 +206,21 @@ tr:hover td{background:var(--bg2)}
   </div>
 </div>
 
+<!-- MODAL EDITAR -->
+<div id="editModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;padding:16px">
+  <div style="background:var(--bg);border-radius:var(--rl);padding:20px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-size:15px;font-weight:600">Editar registro</div>
+      <button class="btn bsm" onclick="cerrarEdit()"><i class="ti ti-x"></i></button>
+    </div>
+    <div id="editBody"></div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btnp" onclick="guardarEdit()"><i class="ti ti-check"></i> Guardar cambios</button>
+      <button class="btn" onclick="cerrarEdit()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 var D = {ventas:[],gastos:[],arqueos:[]};
 var cBar=null,cLine=null,cProy=null,REF=null;
@@ -307,6 +322,43 @@ function delGasto(i){if(!confirm('¿Eliminar?'))return;D.gastos.splice(i,1);save
 function delVenta(i){if(!confirm('¿Eliminar?'))return;D.ventas.splice(i,1);saveD();}
 function delArqueo(i){if(!confirm('¿Eliminar?'))return;D.arqueos.splice(i,1);saveD();}
 
+function editarItem(s,i){
+  var m=document.getElementById('editModal');
+  var body=document.getElementById('editBody');
+  var item=s==='v'?D.ventas[i]:s==='g'?D.gastos[i]:D.arqueos[i];
+  m.dataset.s=s;m.dataset.i=i;
+  if(s==='v'){
+    body.innerHTML='<div class="r3"><div class="fg"><label>Local</label><select id="eLocal"><option value="cheeky"'+(item.local==='cheeky'?' selected':'')+'>Cheeky</option><option value="markova"'+(item.local==='markova'?' selected':'')+'>Markova</option></select></div><div class="fg"><label>Mes</label><input type="month" id="eMes" value="'+item.mes+'"></div><div class="fg"><label>Fecha</label><input type="date" id="eFecha" value="'+(item.fecha||'')+'"></div></div><div class="r2"><div class="fg"><label>Tarjeta (ARS)</label><input type="number" id="eTarj" value="'+(item.tarjeta||0)+'"></div><div class="fg"><label>EFT (ARS)</label><input type="number" id="eEft" value="'+(item.eft||0)+'"></div></div>';
+  } else if(s==='g'){
+    var cats=(GCATS[item.tipo]||[]).map(function(c){return '<option'+(c===item.cat?' selected':'')+'>'+c+'</option>';}).join('');
+    body.innerHTML='<div class="r3"><div class="fg"><label>Tipo</label><select id="eTipo" onchange="updateEditCats()"><option value="gasto"'+(item.tipo==='gasto'?' selected':'')+'>Gasto fijo</option><option value="sueldo"'+(item.tipo==='sueldo'?' selected':'')+'>Sueldo</option><option value="comision"'+(item.tipo==='comision'?' selected':'')+'>Comisión</option><option value="impuesto"'+(item.tipo==='impuesto'?' selected':'')+'>Impuesto</option><option value="otro"'+(item.tipo==='otro'?' selected':'')+'>Otro</option></select></div><div class="fg"><label>Local</label><select id="eLocal"><option value="cheeky"'+(item.local==='cheeky'?' selected':'')+'>Cheeky</option><option value="markova"'+(item.local==='markova'?' selected':'')+'>Markova</option><option value="compartido"'+(item.local==='compartido'?' selected':'')+'>Compartido</option></select></div><div class="fg"><label>Fecha</label><input type="date" id="eFecha" value="'+(item.fecha||'')+'"></div></div><div class="r2"><div class="fg"><label>Categoría</label><select id="eCat">'+cats+'</select></div><div class="fg"><label>Detalle</label><input type="text" id="eDet" value="'+(item.detalle||'')+'"></div></div><div class="fg" style="margin-bottom:10px"><label>Importe (ARS)</label><input type="number" id="eImp" value="'+item.importe+'"></div>';
+  } else {
+    body.innerHTML='<div class="r3"><div class="fg"><label>Fecha</label><input type="date" id="eFecha" value="'+item.fecha+'"></div><div class="fg"><label>EFT Cheeky</label><input type="number" id="eEftCK" value="'+item.eftCK+'"></div><div class="fg"><label>EFT Markova</label><input type="number" id="eEftMK" value="'+item.eftMK+'"></div></div>';
+  }
+  m.style.display='flex';
+}
+
+function updateEditCats(){
+  var t=document.getElementById('eTipo').value;
+  document.getElementById('eCat').innerHTML=(GCATS[t]||[]).map(function(c){return '<option>'+c+'</option>';}).join('');
+}
+
+function cerrarEdit(){document.getElementById('editModal').style.display='none';}
+
+async function guardarEdit(){
+  var m=document.getElementById('editModal'),s=m.dataset.s,i=parseInt(m.dataset.i);
+  if(s==='v'){
+    D.ventas[i]={local:document.getElementById('eLocal').value,mes:document.getElementById('eMes').value,fecha:document.getElementById('eFecha').value,tarjeta:parseFloat(document.getElementById('eTarj').value)||0,eft:parseFloat(document.getElementById('eEft').value)||0};
+  } else if(s==='g'){
+    D.gastos[i]={tipo:document.getElementById('eTipo').value,local:document.getElementById('eLocal').value,fecha:document.getElementById('eFecha').value,cat:document.getElementById('eCat').value,detalle:document.getElementById('eDet').value.trim(),importe:parseFloat(document.getElementById('eImp').value)||0};
+  } else {
+    D.arqueos[i]={fecha:document.getElementById('eFecha').value,eftCK:parseFloat(document.getElementById('eEftCK').value)||0,eftMK:parseFloat(document.getElementById('eEftMK').value)||0};
+    D.arqueos.sort(function(a,b){return a.fecha.localeCompare(b.fecha);});
+  }
+  cerrarEdit();
+  await saveD();
+}
+
 function getLast6(){var h=new Date();return Array.from({length:6},function(_,i){var d=new Date(h.getFullYear(),h.getMonth()-5+i,1);return d.toISOString().substring(0,7);});}
 function refresh(t){if(t==='inicio')renderInicio();if(t==='cobros')renderCobros();if(t==='arqueo')renderArqueo();if(t==='equilibrio')renderEquilibrio();if(t==='registros')renderRegs();}
 
@@ -396,7 +448,7 @@ function renderRegs(){
   items.sort(function(a,b){return(b.fecha||'').localeCompare(a.fecha||'');});
   if(!items.length){document.getElementById('tablaRegs').innerHTML='<div class="empty">Sin registros.</div>';return;}
   var h='<table><colgroup><col style="width:80px"><col style="width:70px"><col style="width:66px"><col><col style="width:88px"><col style="width:86px"><col style="width:32px"></colgroup><thead><tr><th>Fecha</th><th>Tipo</th><th>Local</th><th>Detalle</th><th style="text-align:right">Importe</th><th style="text-align:right">Ing. real</th><th></th></tr></thead><tbody>';
-  items.forEach(function(row){var del=row._s==='g'?'onclick="delGasto('+row._i+')"':(row._s==='v'?'onclick="delVenta('+row._i+')"':row._s==='a'?'onclick="delArqueo('+row._i+')"':'');h+='<tr><td>'+(row.fecha||'-')+'</td><td><span class="bdg '+(TBDG[row.tipo]||'bo')+'">'+(TLBL[row.tipo]||row.tipo)+'</span></td><td><span class="bdg '+(LBDG[row.local]||'bco')+'">'+(LNOM[row.local]||row.local)+'</span></td><td title="'+row.cat+'">'+row.cat+'</td><td style="text-align:right;font-weight:600">'+fmt(row.imp)+'</td><td style="text-align:right;color:#1D9E75">'+(row.ir!==null?fmt(row.ir):'-')+'</td><td><button class="btn bsm" '+del+'><i class="ti ti-x"></i></button></td></tr>';});
+  items.forEach(function(row){var del=row._s==='g'?'onclick="delGasto('+row._i+')"':(row._s==='v'?'onclick="delVenta('+row._i+')"':row._s==='a'?'onclick="delArqueo('+row._i+')"':'');var edit='onclick="editarItem(\''+row._s+'\','+row._i+')"';h+='<tr><td>'+(row.fecha||'-')+'</td><td><span class="bdg '+(TBDG[row.tipo]||'bo')+'">'+(TLBL[row.tipo]||row.tipo)+'</span></td><td><span class="bdg '+(LBDG[row.local]||'bco')+'">'+(LNOM[row.local]||row.local)+'</span></td><td title="'+row.cat+'">'+row.cat+'</td><td style="text-align:right;font-weight:600">'+fmt(row.imp)+'</td><td style="text-align:right;color:#1D9E75">'+(row.ir!==null?fmt(row.ir):'-')+'</td><td style="white-space:nowrap"><button class="btn bsm" '+edit+' style="margin-right:3px"><i class="ti ti-pencil"></i></button><button class="btn bsm" '+del+'><i class="ti ti-x"></i></button></td></tr>';});
   document.getElementById('tablaRegs').innerHTML=h+'</tbody></table>';
 }
 
