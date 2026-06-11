@@ -546,7 +546,15 @@ function initMeses(){
   sel.innerHTML=o;
 }
 
-document.getElementById('selMes').addEventListener('change',function(){var t=(document.querySelector('.sec.on')||{}).id;if(t)refresh(t.replace('tab-',''));});
+document.getElementById('selMes').addEventListener('change',function(){
+  var t=(document.querySelector('.sec.on')||{}).id;if(t)refresh(t.replace('tab-',''));
+  var mes=getMes();
+  if(mes!=='todos'){
+    var d=mes+'-01';
+    ['fFecha','gFecha','aFecha'].forEach(function(id){document.getElementById(id).value=d;});
+    document.getElementById('fMes').value=mes;
+  }
+});
 document.getElementById('inTC').addEventListener('change',function(){var t=(document.querySelector('.sec.on')||{}).id;if(t)refresh(t.replace('tab-',''));});
 document.getElementById('fLocal').addEventListener('change',function(){toggleDesc();calcPrev();});
 
