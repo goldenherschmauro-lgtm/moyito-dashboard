@@ -99,9 +99,11 @@ tr:hover td{background:var(--bg2)}
     <button class="tab" onclick="goTab('equilibrio',this)"><i class="ti ti-trending-up"></i> Equilibrio</button>
     <button class="tab" onclick="goTab('proyeccion',this)"><i class="ti ti-chart-line"></i> Proyección</button>
     <button class="tab" onclick="goTab('registros',this)"><i class="ti ti-list"></i> Registros</button>
+    <button class="tab" onclick="goTab('cheques',this)"><i class="ti ti-file-invoice"></i> Cheques</button>
   </div>
 
   <div id="tab-inicio" class="sec on">
+    <div id="alertaChequesInicio"></div>
     <div id="banner"></div>
     <div class="g4" id="kpis"></div>
     <div class="g2">
@@ -231,6 +233,40 @@ tr:hover td{background:var(--bg2)}
   </div>
 </div>
 
+  <!-- CHEQUES -->
+  <div id="tab-cheques" class="sec">
+    <div id="alertaCheques"></div>
+    <div class="card">
+      <div class="ct">Registrar cheque</div>
+      <div class="r3">
+        <div class="fg"><label>Banco</label>
+          <select id="chBanco">
+            <option value="BNA">BNA - Banco Nación</option>
+            <option value="Supervielle">Supervielle</option>
+            <option value="Santander">Santander</option>
+          </select>
+        </div>
+        <div class="fg"><label>Concepto</label><input type="text" id="chConcepto" placeholder="A quién pertenece..."></div>
+        <div class="fg"><label>Fecha de cobro</label><input type="date" id="chFecha"></div>
+      </div>
+      <div class="r2">
+        <div class="fg"><label>Importe (ARS)</label><input type="number" id="chImporte" placeholder="0" min="0"></div>
+        <div style="display:flex;align-items:flex-end;gap:8px">
+          <button class="btn btnp" onclick="guardarCheque()"><i class="ti ti-check"></i> Guardar</button>
+          <span class="msok" id="msCH">Guardado</span>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ct">Cheques pendientes</div>
+      <div class="tbl" id="listaCheques"></div>
+    </div>
+    <div class="card">
+      <div class="ct">Cheques cobrados</div>
+      <div class="tbl" id="listaCobraidos"></div>
+    </div>
+  </div>
+
 <!-- MODAL -->
 <div id="editModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;padding:16px">
   <div style="background:var(--bg);border-radius:var(--rl);padding:20px;width:100%;max-width:580px;max-height:90vh;overflow-y:auto">
@@ -247,7 +283,7 @@ tr:hover td{background:var(--bg2)}
 </div>
 
 <script>
-var D={ventas:[],gastos:[],arqueos:[]};
+var D={ventas:[],gastos:[],arqueos:[],cheques:[]};
 var cBar=null,cLine=null,cProy=null,REF=null;
 
 var GCATS={
@@ -277,7 +313,7 @@ function startFirebase(){
     });
     REF=firebase.firestore().collection("dashboard").doc("data");
     REF.onSnapshot(function(snap){
-      D=snap.exists?{ventas:snap.data().ventas||[],gastos:snap.data().gastos||[],arqueos:snap.data().arqueos||[]}:{ventas:[],gastos:[],arqueos:[]};
+      D=snap.exists?{ventas:snap.data().ventas||[],gastos:snap.data().gastos||[],arqueos:snap.data().arqueos||[],cheques:snap.data().cheques||[]}:{ventas:[],gastos:[],arqueos:[],cheques:[]};
       setSt('ok','Sincronizado · Meta USD 4.000/mes');
       var t=(document.querySelector('.sec.on')||{}).id;
       if(t) refresh(t.replace('tab-',''));
@@ -422,7 +458,7 @@ async function guardarEdit(){
 }
 
 function getLast6(){var h=new Date();return Array.from({length:6},function(_,i){var d=new Date(h.getFullYear(),h.getMonth()-5+i,1);return d.toISOString().substring(0,7);});}
-function refresh(t){if(t==='inicio')renderInicio();if(t==='cobros')renderCobros();if(t==='arqueo')renderArqueo();if(t==='equilibrio')renderEquilibrio();if(t==='registros')renderRegs();}
+function refresh(t){if(t==='inicio')renderInicio();if(t==='cobros')renderCobros();if(t==='arqueo')renderArqueo();if(t==='equilibrio')renderEquilibrio();if(t==='registros')renderRegs();if(t==='cheques')renderCheques();}
 
 function renderInicio(){
   var mes=getMes(),TC=tc(),META=4000,mesRef=mes==='todos'?new Date().toISOString().substring(0,7):mes;
@@ -449,6 +485,7 @@ function renderInicio(){
     return '<div class="crow"><div class="ch"><div style="display:flex;align-items:center;gap:8px"><span class="bdg '+bc+'">'+lb+'</span><span style="font-size:13px;font-weight:500">Liq. '+mesRef+'</span></div><div style="display:flex;gap:8px;align-items:center"><span style="font-size:11px;color:var(--text2)">día '+d+'/'+m2+'/'+y2+'</span><span style="font-size:11px;font-weight:500;padding:2px 8px;border-radius:10px;background:'+(pend?'#FAEEDA':'#E1F5EE')+';color:'+(pend?'#854F0B':'#085041')+'">'+(pend?'pendiente':'cobrado')+'</span></div></div><div class="g4" style="margin-bottom:0"><div class="mc"><div class="l">Venta bruta</div><div style="font-size:13px;font-weight:600">'+fmt(det.bruta)+'</div></div><div class="mc"><div class="l">EFT en caja</div><div style="font-size:13px;font-weight:600;color:#1D9E75">'+fmt(det.eft)+'</div></div><div class="mc"><div class="l">Transferencia</div><div style="font-size:13px;font-weight:600;color:#BA7517">'+fmt(det.transf)+'</div></div><div class="mc"><div class="l">Ingreso real (EFT+Transf)</div><div style="font-size:13px;font-weight:600;color:#185FA5">'+fmt(det.total)+'</div></div></div></div>';
   }
   document.getElementById('proxLiq').innerHTML=rowL('Markova','bmk',5,nm,ny,dMK,hoy<new Date(ny,nm-1,5))+rowL('Cheeky','bck',30,nm,ny,dCK,hoy<new Date(ny,nm-1,30));
+  renderAlertaCheques();
 }
 
 function renderCobros(){
@@ -534,6 +571,96 @@ function exportCSV(){
   a.download='moyito_'+new Date().toISOString().substring(0,10)+'.csv';a.click();
 }
 
+function guardarCheque(){
+  var banco=document.getElementById('chBanco').value;
+  var concepto=document.getElementById('chConcepto').value.trim();
+  var fecha=document.getElementById('chFecha').value;
+  var importe=parseFloat(document.getElementById('chImporte').value)||0;
+  if(!fecha||importe<=0){alert('Completá todos los campos');return;}
+  D.cheques.push({banco:banco,concepto:concepto,fecha:fecha,importe:importe,cobrado:false});
+  D.cheques.sort(function(a,b){return a.fecha.localeCompare(b.fecha);});
+  saveD();showMsg('msCH');
+  document.getElementById('chConcepto').value='';
+  document.getElementById('chImporte').value='';
+  renderCheques();
+}
+
+async function marcarCobrado(i){
+  D.cheques[i].cobrado=true;
+  D.cheques[i].fechaCobro=new Date().toISOString().split('T')[0];
+  await saveD();
+  renderCheques();
+  renderAlertaCheques();
+}
+
+async function delCheque(i){
+  if(!confirm('¿Eliminar este cheque?'))return;
+  D.cheques.splice(i,1);
+  await saveD();
+  renderCheques();
+  renderAlertaCheques();
+}
+
+function renderAlertaCheques(){
+  var hoy=new Date();
+  var en7=new Date();en7.setDate(en7.getDate()+7);
+  var proximos=D.cheques.filter(function(c){
+    if(c.cobrado)return false;
+    var fc=new Date(c.fecha+'T00:00:00');
+    return fc<=en7;
+  });
+  var el=document.getElementById('alertaChequesInicio');
+  if(!el)return;
+  if(!proximos.length){el.innerHTML='';return;}
+  var total=proximos.reduce(function(a,c){return a+c.importe;},0);
+  var items=proximos.map(function(c){
+    var fc=new Date(c.fecha+'T00:00:00');
+    var dias=Math.round((fc-hoy)/(1000*60*60*24));
+    var txt=dias<0?'Vencido hace '+Math.abs(dias)+' día(s)':dias===0?'Vence HOY':'Vence en '+dias+' día(s)';
+    return '<span style="font-size:12px">· <b>'+c.banco+'</b> '+c.concepto+' '+fmt(c.importe)+' — <b>'+txt+'</b></span>';
+  }).join('<br>');
+  el.innerHTML='<div style="background:#FAECE7;border:0.5px solid #F0997B;border-radius:var(--rl);padding:12px 16px;margin-bottom:14px"><div style="font-size:13px;font-weight:600;color:#712B13;margin-bottom:6px"><i class="ti ti-alert-circle"></i> '+proximos.length+' cheque(s) por cobrar — Total: '+fmt(total)+'</div>'+items+'</div>';
+}
+
+function renderCheques(){
+  var pendientes=D.cheques.map(function(c,i){return{c:c,i:i};}).filter(function(x){return !x.c.cobrado;});
+  var cobrados=D.cheques.map(function(c,i){return{c:c,i:i};}).filter(function(x){return x.c.cobrado;});
+  var hoy=new Date();
+  var en7=new Date();en7.setDate(en7.getDate()+7);
+
+  // Alerta en tab cheques
+  var al=document.getElementById('alertaCheques');
+  var proximos=pendientes.filter(function(x){return new Date(x.c.fecha+'T00:00:00')<=en7;});
+  if(proximos.length){
+    var total=proximos.reduce(function(a,x){return a+x.c.importe;},0);
+    al.innerHTML='<div style="background:#FAECE7;border:0.5px solid #F0997B;border-radius:var(--rl);padding:12px 16px;margin-bottom:12px"><div style="font-size:13px;font-weight:600;color:#712B13"><i class="ti ti-alert-circle"></i> '+proximos.length+' cheque(s) próximos a cobrar — '+fmt(total)+'</div></div>';
+  } else { al.innerHTML=''; }
+
+  // Lista pendientes
+  if(!pendientes.length){document.getElementById('listaCheques').innerHTML='<div class="empty">Sin cheques pendientes.</div>';}
+  else{
+    var h='<table><colgroup><col style="width:90px"><col style="width:90px"><col><col style="width:90px"><col style="width:100px"></colgroup><thead><tr><th>Fecha cobro</th><th>Banco</th><th>Concepto</th><th style="text-align:right">Importe</th><th></th></tr></thead><tbody>';
+    pendientes.forEach(function(x){
+      var fc=new Date(x.c.fecha+'T00:00:00');
+      var dias=Math.round((fc-hoy)/(1000*60*60*24));
+      var vto=dias<0?'<span style="color:#D85A30;font-weight:600">Vencido</span>':dias===0?'<span style="color:#D85A30;font-weight:600">Hoy</span>':dias<=7?'<span style="color:#BA7517;font-weight:600">'+dias+'d</span>':'<span style="color:var(--text2)">'+dias+'d</span>';
+      h+='<tr><td>'+x.c.fecha+' '+vto+'</td><td><span class="bdg bck">'+x.c.banco+'</span></td><td title="'+x.c.concepto+'">'+x.c.concepto+'</td><td style="text-align:right;font-weight:600">'+fmt(x.c.importe)+'</td><td style="white-space:nowrap"><button class="btn bsm btnp" onclick="marcarCobrado('+x.i+')" style="margin-right:2px"><i class="ti ti-check"></i> Cobrado</button><button class="btn bsm" onclick="delCheque('+x.i+')"><i class="ti ti-x"></i></button></td></tr>';
+    });
+    document.getElementById('listaCheques').innerHTML=h+'</tbody></table>';
+  }
+
+  // Lista cobrados
+  if(!cobrados.length){document.getElementById('listaCobraidos').innerHTML='<div class="empty">Sin cheques cobrados aún.</div>';}
+  else{
+    var h2='<table><colgroup><col style="width:90px"><col style="width:90px"><col><col style="width:90px"><col style="width:34px"></colgroup><thead><tr><th>Fecha cobro</th><th>Banco</th><th>Concepto</th><th style="text-align:right">Importe</th><th></th></tr></thead><tbody>';
+    cobrados.forEach(function(x){
+      h2+='<tr><td style="color:var(--text2)">'+x.c.fecha+'</td><td><span class="bdg bv">'+x.c.banco+'</span></td><td title="'+x.c.concepto+'">'+x.c.concepto+'</td><td style="text-align:right;font-weight:600;color:#1D9E75">'+fmt(x.c.importe)+'</td><td><button class="btn bsm" onclick="delCheque('+x.i+')"><i class="ti ti-x"></i></button></td></tr>';
+    });
+    document.getElementById('listaCobraidos').innerHTML=h2+'</tbody></table>';
+  }
+  renderAlertaCheques();
+}
+
 function goTab(t,btn){
   document.querySelectorAll('.tab').forEach(function(b){b.classList.remove('on');});
   document.querySelectorAll('.sec').forEach(function(s){s.classList.remove('on');});
@@ -562,6 +689,7 @@ initMeses();
 var hoy=new Date().toISOString().split('T')[0];
 ['fFecha','gFecha','aFecha'].forEach(function(id){document.getElementById(id).value=hoy;});
 document.getElementById('fMes').value=hoy.substring(0,7);
+document.getElementById('chFecha').value=hoy;
 updateCats();
 toggleDesc();
 calcPrev();
